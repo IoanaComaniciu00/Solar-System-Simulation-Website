@@ -1,170 +1,220 @@
-/*
-
-This is the main ThreeJS application file for the Solar System Simulation Website
-
-*/
-
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
-// Constants
-const SUN_RADIUS = 10;
-const FRAME_SPEED = 0.1;
-
-// Planet data (radius,color and orbit_scale for each)
-const planets = [
-    { name: "Mercury", file: "mercury_positions.json", radius: 1.25, color: 0xff3333, ORBIT_SCALE: 0.0000005 },
-    { name: "Venus", file: "venus_positions.json", radius: 2.5, color: 0xffcc33, ORBIT_SCALE: 0.0000005 },
-    { name: "Earth", file: "earth_positions.json", radius: 2.75, color: 0x3399ff, ORBIT_SCALE: 0.0000005 },
-    { name: "Mars", file: "mars_positions.json", radius: 1.75, color: 0xff6633, ORBIT_SCALE: 0.0000005 },
-    { name: "Jupiter", file: "jupiter_positions.json", radius: 7, color: 0xffcc33, ORBIT_SCALE: 0.0000003 },
-    { name: "Saturn", file: "saturn_positions.json", radius: 6, color: 0xffcc33, ORBIT_SCALE: 0.0000003 },
-    { name: "Uranus", file: "uranus_positions.json", radius: 4.25, color: 0x66ccff, ORBIT_SCALE: 0.0000003 },
-    { name: "Neptune", file: "neptune_positions.json", radius: 4, color: 0x3333ff, ORBIT_SCALE: 0.0000003 },
-    { name: "Pluto", file: "pluto_positions.json", radius: 0.75, color: 0xaaaaaa, ORBIT_SCALE: 0.0000003 }
-];
-
-// Scene setup
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000);
-camera.position.set(0, 50, 200);
+scene.background = new THREE.Color(0x000000);
 
+// Renderer
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setClearColor(0x000011);
 document.body.appendChild(renderer.domElement);
 
+// Camera
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 20000);
+camera.position.set(0, 500, 1500);
+
+// Controls
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-controls.dampingFactor = 0.05;
-controls.minDistance = SUN_RADIUS * 1.5;
-controls.maxDistance = 10000;
 
-// Lighting
-const sunLight = new THREE.PointLight(0xffffff, 2, 1000);
+// Lights
+const sunLight = new THREE.PointLight(0xffffff, 10, 0);
 sunLight.position.set(0, 0, 0);
 scene.add(sunLight);
-scene.add(new THREE.AmbientLight(0x404040));
 
-// Sun
-const sunGeometry = new THREE.SphereGeometry(SUN_RADIUS, 32, 32);
-const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00, emissive: 0xffff33, emissiveIntensity: 0.2 });
-const sun = new THREE.Mesh(sunGeometry, sunMaterial);
-scene.add(sun);
-controls.target.copy(sun.position);
+const ambientLight = new THREE.AmbientLight(0xffffff, 1);
+scene.add(ambientLight);
 
-// Create planet meshes 
+// Texture Loader
+const textureLoader = new THREE.TextureLoader();
+
+const planets = [
+    { name: 'mercury', size: 10, texture: 'textures/mercury/MercuryAlbedo.jpeg', normal: 'textures/mercury/MercuryNormal.jpeg', scale: 400000, tilt: 0.034, rotationSpeed: 0.004 },
+    { name: 'venus', size: 20, texture: 'textures/venus/VenusAlbedo.jpeg', normal: 'textures/venus/VenusNormal.jpeg', scale: 400000, tilt: 177.4 * Math.PI / 180, rotationSpeed: -0.0001 },
+    { name: 'earth', size: 22, texture: 'textures/earth/EarthAlbedo.jpeg', normal: 'textures/earth/EarthNormal.jpeg', roughness: 'textures/earth/EarthRoughness.jpeg', clouds: 'textures/earth/cloud_combined_2048.png', scale: 400000, tilt: 23.5 * Math.PI / 180, rotationSpeed: 0.01 },
+    { name: 'mars', size: 18, texture: 'textures/mars/MarsAlbedo.jpeg', normal: 'textures/mars/MarsNormal.jpeg', scale: 400000, tilt: 25 * Math.PI / 180, rotationSpeed: 0.009 },
+    { name: 'jupiter', size: 70, texture: 'textures/jupiter/JupiterAlbedo.jpeg', normal: 'textures/jupiter/JupiterNormal.jpeg', scale: 520000, tilt: 3.1 * Math.PI / 180, rotationSpeed: 0.04 },
+    { name: 'saturn', size: 60, texture: 'textures/saturn/SaturnAlbedo.png', rings: 'textures/saturn/rings.png', normal: 'textures/saturn/SaturnNormal.png', scale: 520000, tilt: 26.7 * Math.PI / 180, rotationSpeed: 0.038 },
+    { name: 'uranus', size: 40, texture: 'textures/uranus/UranusAlbedo.png', normal: 'textures/uranus/UranusNormal.png', scale: 520000, tilt: 97.8 * Math.PI / 180, rotationSpeed: 0.03 },
+    { name: 'neptune', size: 39, texture: 'textures/neptune/NeptuneColor.jpeg', normal: 'textures/neptune/NeptuneNormal.jpeg', scale: 520000, tilt: 28.3 * Math.PI / 180, rotationSpeed: 0.032 },
+    { name: 'pluto', size: 14, texture: 'textures/pluto/PlutoAlbedo.jpeg', normal: 'textures/pluto/PlutoNormal.jpeg', scale: 520000, tilt: 119.6 * Math.PI / 180, rotationSpeed: 0.003 }
+];
+
 const planetMeshes = {};
-planets.forEach(p => {
-    const geo = new THREE.SphereGeometry(p.radius, 32, 32);
-    const mat = new THREE.MeshStandardMaterial({
-        color: p.color,
-        emissive: p.color,
-        emissiveIntensity: 0.3,
-        roughness: 0.7,
-        metalness: 0.1
-    });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.name = p.name;
-    scene.add(mesh);
-    planetMeshes[p.name] = mesh;
+const orbitLines = {};
+let orbitsVisible = true;
 
-    // Orbit path line
-    const line = new THREE.Line(
-        new THREE.BufferGeometry(),
-        new THREE.LineBasicMaterial({ color: 0x888888 })
-    );
-    scene.add(line);
-    p.orbitPath = line;
+// Sun Core
+const sunGeometry = new THREE.SphereGeometry(100, 64, 64);
+const sunMaterial = new THREE.MeshStandardMaterial({
+    map: textureLoader.load('textures/sun/SunAlbedo.jpeg'),
+    emissive: 0xffaa00,
+    emissiveIntensity: 1.2
 });
+const sunMesh = new THREE.Mesh(sunGeometry, sunMaterial);
+scene.add(sunMesh);
 
-// Store planet positions after loading JSON
-const planetPositions = {};
-let frameIndex = 0;
-
-// Load all planet JSON files and start animation
-const planetPromises = planets.map(planet =>
-    fetch(planet.file)
-        .then(res => res.json())
-        .then(data => {
-            planetPositions[planet.name] = data;
-            console.log(`Loaded ${data.length} positions for ${planet.name}`);
-
-            // Set orbit path using .pos
-            const points = data
-                .filter(entry => entry && entry.pos && entry.pos.length === 3)
-                .map(entry => new THREE.Vector3(
-                    entry.pos[0] * planet.ORBIT_SCALE,
-                    entry.pos[1] * planet.ORBIT_SCALE,
-                    entry.pos[2] * planet.ORBIT_SCALE
-                ));
-
-            planet.orbitPath.geometry.setFromPoints(points);
-            console.log(`${planet.name} sample positions:`, data.slice(0, 5));
-        })
-        .catch(err => console.error(`Error loading ${planet.name}:`, err))
-);
-
-Promise.all(planetPromises).then(() => {
-    console.log("All planets loaded. Starting animation...");
-    animate();
+// Sun Glow using Sprite
+const coronaTexture = textureLoader.load('textures/sun/SunCrown.png');
+const coronaMaterial = new THREE.SpriteMaterial({
+    map: coronaTexture,
+    color: 0xffcc00,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
 });
+const coronaSprite = new THREE.Sprite(coronaMaterial);
+coronaSprite.scale.set(250, 250, 1);
+sunMesh.add(coronaSprite);
 
-// Starfield background
-const createStarfield = () => {
-    const starsGeometry = new THREE.BufferGeometry();
-    const starCount = 5000;
-    const positions = new Float32Array(starCount * 3);
+// Load Planets
+async function loadPlanets() {
+    for (const planet of planets) {
+        const geometry = new THREE.SphereGeometry(planet.size, 32, 32);
+        const texture = textureLoader.load(planet.texture);
+        if (planet.name !== 'earth') {
+            texture.rotation = Math.PI / 4;
+        }
 
-    for (let i = 0; i < starCount; i++) {
-        const i3 = i * 3;
-        positions[i3] = (Math.random() - 0.5) * 10000;
-        positions[i3 + 1] = (Math.random() - 0.5) * 10000;
-        positions[i3 + 2] = (Math.random() - 0.5) * 10000;
+        const normalMap = planet.normal ? textureLoader.load(planet.normal) : null;
+        const roughnessMap = planet.roughness ? textureLoader.load(planet.roughness) : null;
+
+        const material = new THREE.MeshStandardMaterial({
+            map: texture,
+            normalMap: normalMap,
+            roughnessMap: roughnessMap,
+            emissive: 0x111111,
+            emissiveIntensity: 0.2
+        });
+
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.rotation.z = planet.tilt; // Axial tilt
+        mesh.userData.rotationSpeed = planet.rotationSpeed;
+        scene.add(mesh);
+        planetMeshes[planet.name] = mesh;
+
+        // Clouds for Earth
+        if (planet.clouds) {
+            const cloudTexture = textureLoader.load(planet.clouds);
+            const cloudGeo = new THREE.SphereGeometry(planet.size * 1.01, 32, 32);
+            const cloudMat = new THREE.MeshStandardMaterial({
+                map: cloudTexture,
+                transparent: true,
+                opacity: 0.8
+            });
+            const cloudMesh = new THREE.Mesh(cloudGeo, cloudMat);
+            cloudMesh.name = 'clouds';
+            mesh.add(cloudMesh);
+        }
+
+        // Saturn rings
+        if (planet.rings) {
+            const ringGeometry = new THREE.RingGeometry(planet.size * 1.2, planet.size * 2, 64);
+            const ringMaterial = new THREE.MeshBasicMaterial({
+                map: textureLoader.load(planet.rings),
+                side: THREE.DoubleSide,
+                transparent: true
+            });
+            const rings = new THREE.Mesh(ringGeometry, ringMaterial);
+            rings.rotation.z = Math.PI / 2; // correct orientation
+            mesh.add(rings);
+        }
+
+        // Load orbits from JSON
+        const response = await fetch(`orbits/${planet.name}_positions.json`);
+        const orbitData = await response.json();
+
+        const orbitPoints = orbitData.map(d => new THREE.Vector3(d.pos[0] / planet.scale, d.pos[1] / planet.scale, d.pos[2] / planet.scale));
+        const orbitGeometry = new THREE.BufferGeometry().setFromPoints(orbitPoints);
+        const orbitMaterial = new THREE.LineBasicMaterial({ color: 0xffffff });
+        const orbitLine = new THREE.LineLoop(orbitGeometry, orbitMaterial);
+        scene.add(orbitLine);
+        orbitLines[planet.name] = orbitLine;
     }
 
-    starsGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 1, sizeAttenuation: false });
-    scene.add(new THREE.Points(starsGeometry, starsMaterial));
-};
-createStarfield();
+    document.getElementById('loading').style.display = 'none';
+}
 
-// Animate planets
+function createStarField() {
+    const starGeometry = new THREE.BufferGeometry();
+    const starCount = 10000;
+    const positions = [];
+
+    for (let i = 0; i < starCount; i++) {
+        const x = (Math.random() - 0.5) * 20000;
+        const y = (Math.random() - 0.5) * 20000;
+        const z = (Math.random() - 0.5) * 20000;
+        positions.push(x, y, z);
+    }
+
+    starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    const starMaterial = new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 2
+    });
+
+    const stars = new THREE.Points(starGeometry, starMaterial);
+    scene.add(stars);
+}
+
+loadPlanets();
+
+let speed = 1;
+let t = 0;
 function animate() {
     requestAnimationFrame(animate);
+    controls.update();
 
-    planets.forEach(p => {
-        const positions = planetPositions[p.name];
-        const mesh = planetMeshes[p.name];
+    // Rotate sun
+    sunMesh.rotation.z += 0.002;
 
-        if (positions && positions.length > 0 && mesh) {
-            const idx = Math.floor(frameIndex) % positions.length;
-            const entry = positions[idx];
+    // Animate planets along orbit
+    t += speed;
+    for (const planet of planets) {
+        const mesh = planetMeshes[planet.name];
+        if (mesh) {
+            const orbit = orbitLines[planet.name];
+            if (orbit) {
+                const position = orbit.geometry.attributes.position;
+                const index = Math.floor((t / 2) % position.count);
+                mesh.position.fromBufferAttribute(position, index);
+                mesh.rotation.z += mesh.userData.rotationSpeed;
 
-            if (entry && entry.pos && entry.pos.length === 3) {
-                const [x, y, z] = entry.pos;
-
-                mesh.position.set(
-                    x * p.ORBIT_SCALE,
-                    y * p.ORBIT_SCALE,
-                    z * p.ORBIT_SCALE
-                );
-
-                if (p.name === "Mars" && frameIndex % 60 === 0) {
-                    console.log("Mars pos:", entry.pos, "scaled:", mesh.position);
+                // Rotate clouds 
+                const cloudMesh = mesh.getObjectByName('clouds');
+                if (cloudMesh) {
+                    cloudMesh.rotation.z += 0.002;
                 }
             }
         }
-    });
+    }
 
-    frameIndex += FRAME_SPEED;
-    controls.update();
     renderer.render(scene, camera);
 }
 
-// Handle window resize
-window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+animate();
+createStarField();
+
+// Toggle Orbits Button
+document.getElementById('toggleOrbits').addEventListener('click', () => {
+    orbitsVisible = !orbitsVisible;
+    for (const line of Object.values(orbitLines)) {
+        line.visible = orbitsVisible;
+    }
+});
+
+// Speed Control Buttons
+document.getElementById('speedUp').addEventListener('click', () => {
+    speed *= 1.5;
+});
+
+document.getElementById('speedDown').addEventListener('click', () => {
+    speed *= 0.7;
+});
+
+// Reset camera
+document.getElementById('resetView').addEventListener('click', () => {
+    camera.position.set(0, 500, 1500);
+    controls.target.set(0, 0, 0);
+    controls.update();
 });

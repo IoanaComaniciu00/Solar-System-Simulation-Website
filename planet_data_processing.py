@@ -1,15 +1,12 @@
 '''
 This file contains functions to fetch and process planetary data from the JPL Horizons API.
 '''
+import os
 import requests
 import re
 import math
 import json
 from datetime import datetime, timedelta
-
-"""
-This function fetches the state vectors (position and velocity) of a specified planet
-"""
 
 
 def get_planet_data(planet: int) -> tuple[list, list]:
@@ -151,6 +148,11 @@ def propagate_orbit(position: list, velocity: list, step_days: int = 1) -> list:
 
 
 if __name__ == "__main__":
+    # Create orbits directory if it doesn't exist
+    orbits_dir = "orbits"
+    if not os.path.exists(orbits_dir):
+        os.makedirs(orbits_dir)
+
     # Planet IDs for JPL Horizons
     planet_ids = {
         "mercury": 199,
@@ -184,7 +186,7 @@ if __name__ == "__main__":
         step_days = planet_step_days[planet_name]
         data = propagate_orbit(position, velocity, step_days=step_days)
 
-        filename = f"{planet_name}_positions.json"
+        filename = f"{orbits_dir}/{planet_name}_positions.json"
         with open(filename, "w") as f:
             json.dump(data, f, indent=2)
 
